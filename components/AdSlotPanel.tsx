@@ -21,7 +21,7 @@ export default function AdSlotPanel({
   onLogoUpload,
   uploadedLogo,
 }: AdSlotPanelProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [step, setStep] = useState<PanelStep>("detail");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -175,16 +175,16 @@ export default function AdSlotPanel({
                   {/* Upload Area */}
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-[#1D1D1F]/15 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-[#1D1D1F]/35 hover:bg-[#F5F5F7]/50 transition-all duration-300 mb-6"
+                    className="border-2 border-dashed border-[#1D1D1F]/15 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-[#1D1D1F]/35 hover:bg-[#F5F5F7]/50 transition-all duration-300 mb-4"
                   >
                     {uploadedLogo ? (
                       <div className="flex flex-col items-center">
                         <img
                           src={uploadedLogo}
                           alt="Logo preview"
-                          className="max-w-[140px] max-h-[100px] object-contain mb-3"
+                          className="max-w-[140px] max-h-[100px] object-contain mb-3 drop-shadow-xs"
                         />
-                        <p className="text-[13px] text-[#86868B]">
+                        <p className="text-[13px] text-[#86868B] font-medium">
                           {t.panel.changeLogo}
                         </p>
                       </div>
@@ -212,9 +212,21 @@ export default function AdSlotPanel({
                   </div>
 
                   {uploadedLogo && (
-                    <p className="text-[13px] text-[#86868B] text-center mb-6">
-                      {t.panel.previewNote}
-                    </p>
+                    <div className="flex items-center justify-between mb-6 px-1">
+                      <p className="text-[13px] text-[#86868B]">
+                        {t.panel.previewNote}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onLogoUpload("");
+                        }}
+                        className="text-[12px] font-medium text-red-500 hover:text-red-600 hover:underline cursor-pointer"
+                      >
+                        {language === "tr" ? "Logoyu Kaldır" : "Remove Logo"}
+                      </button>
+                    </div>
                   )}
 
                   {/* Reserve Button */}

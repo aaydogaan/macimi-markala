@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { adSlots, AdSlot as AdSlotType } from "@/data/adSlots";
@@ -11,16 +11,45 @@ export default function MacBookDisplay() {
   const { t, language } = useLanguage();
   const [viewMode, setViewMode] = useState<"live" | "final">("live");
   const [selectedSlot, setSelectedSlot] = useState<AdSlotType | null>(null);
-  const [uploadedLogo, setUploadedLogo] = useState<string | null>(null);
+  
+  // Persistent map of slotId -> logoDataUrl
+  const [uploadedLogos, setUploadedLogos] = useState<Record<string, string>>({});
+
+  // Load saved logos from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("mac_uploaded_logos");
+      if (saved) {
+        setUploadedLogos(JSON.parse(saved));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleLogoUpload = (slotId: string, dataUrl: string | null) => {
+    setUploadedLogos((prev) => {
+      const updated = { ...prev };
+      if (dataUrl) {
+        updated[slotId] = dataUrl;
+      } else {
+        delete updated[slotId];
+      }
+      try {
+        localStorage.setItem("mac_uploaded_logos", JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  };
 
   const handleSlotClick = (slot: AdSlotType) => {
     setSelectedSlot(slot);
-    setUploadedLogo(null);
   };
 
   const handleClose = () => {
     setSelectedSlot(null);
-    setUploadedLogo(null);
   };
 
   // Spot placement grid areas (Exact 6-column, 3-row grid layout from original site)
@@ -98,6 +127,7 @@ export default function MacBookDisplay() {
                 >
                   {adSlots.map((slot) => {
                     const isSelected = selectedSlot?.id === slot.id;
+                    const slotLogo = uploadedLogos[slot.id];
                     const isSold = slot.status === "sold";
 
                     const sizeText =
@@ -119,17 +149,19 @@ export default function MacBookDisplay() {
                           className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-dashed transition-all duration-200 cursor-pointer ${
                             isSelected
                               ? "border-blue-600 bg-blue-50/40 ring-2 ring-blue-600 shadow-md z-20"
+                              : slotLogo
+                              ? "border-black/35 bg-white/70 shadow-xs"
                               : "border-black/25 bg-black/[0.02] hover:border-black/45 hover:bg-black/[0.04]"
                           }`}
                         >
-                          {/* Normal slot content */}
+                          {/* Slot content */}
                           <span className="flex h-full w-full flex-col items-center justify-center gap-1 px-1.5 py-2 transition duration-200 group-hover:blur-[2px] group-focus-visible:blur-[2px]">
-                            {uploadedLogo && isSelected ? (
+                            {slotLogo ? (
                               <span className="relative flex min-h-0 w-full flex-1 items-center justify-center p-1">
                                 <img
-                                  src={uploadedLogo}
-                                  alt="Preview"
-                                  className="max-h-[80%] max-w-[88%] object-contain"
+                                  src={slotLogo}
+                                  alt="Logo"
+                                  className="max-h-[80%] max-w-[88%] object-contain drop-shadow-xs"
                                 />
                               </span>
                             ) : isSold ? (
@@ -158,7 +190,7 @@ export default function MacBookDisplay() {
                             className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
                           >
                             <span className="rounded-full px-3 py-1.5 text-[11px] font-medium text-white sm:px-4 sm:text-[13px] bg-blue-600 shadow-sm">
-                              {selectLabel}
+                              {slotLogo ? (language === "tr" ? "Düzenle" : "Edit") : selectLabel}
                             </span>
                           </span>
                         </button>
@@ -229,8 +261,12 @@ export default function MacBookDisplay() {
       <AdSlotPanel
         slot={selectedSlot}
         onClose={handleClose}
-        onLogoUpload={setUploadedLogo}
-        uploadedLogo={uploadedLogo}
+        onLogoUpload={(dataUrl) => {
+          if (selectedSlot) {
+            handleLogoUpload(selectedSlot.id, dataUrl);
+          }
+        }}
+        uploadedLogo={selectedSlot ? uploadedLogos[selectedSlot.id] || null : null}
       />
     </section>
   );
