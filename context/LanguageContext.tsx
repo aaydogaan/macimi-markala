@@ -126,7 +126,7 @@ export const translations: Record<Language, Translations> = {
       large: "BÜYÜK",
       medium: "ORTA",
       small: "KÜÇÜK",
-      fromPrefix: "",
+      fromPrefix: "$",
       fromSuffix: "'den",
       preview: "Önizleme",
       hint: "Detayları incelemek ve markanızı yerleştirmek için bir alana tıklayın",

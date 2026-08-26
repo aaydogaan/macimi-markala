@@ -128,16 +128,17 @@ export default function MacBookDisplay() {
                           </span>
                         </span>
                       ) : (
-                        <span className="text-[10px] font-semibold tracking-wider text-black/60 uppercase sm:text-[12px]">
-                          {sizeText}
+                        <span className="flex flex-col items-center justify-center gap-1">
+                          <span className="text-[10px] sm:text-[12px] font-semibold tracking-wider text-black/50 uppercase">
+                            {sizeText}
+                          </span>
+                          <span className="shrink-0 text-[12px] sm:text-[15px] font-semibold tabular-nums leading-tight text-black/90">
+                            {t.macbook.fromPrefix}
+                            {slot.price.toLocaleString("en-US")}
+                            {t.macbook.fromSuffix}
+                          </span>
                         </span>
                       )}
-
-                      <span className="shrink-0 text-[11px] font-medium tabular-nums leading-tight text-black/75 sm:text-[14px]">
-                        {t.macbook.fromPrefix}
-                        {slot.price.toLocaleString("en-US")}
-                        {t.macbook.fromSuffix}
-                      </span>
                     </span>
 
                     {/* Hover Action Pill */}
