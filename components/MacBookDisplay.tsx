@@ -118,22 +118,22 @@ export default function MacBookDisplay() {
   const slot10 = adSlots.find((s) => s.id === "slot-10")!;
 
   return (
-    <section className="relative px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24" id="macbook-display">
-      <div className="mx-auto max-w-5xl xl:max-w-6xl">
-        {/* MacBook Lid Container - Space Gray / Silver Metallic Body */}
+    <section className="relative px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24 flex justify-center" id="macbook-display">
+      <div className="w-full max-w-[840px]">
+        {/* MacBook Lid Container - Exact 840 x 577.22 Aspect Ratio */}
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="relative bg-gradient-to-b from-[#EAEAEF] via-[#E2E2E8] to-[#D5D5DC] rounded-[28px] sm:rounded-[44px] p-4 sm:p-7 md:p-10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.18)] border border-black/10"
+          className="relative w-full aspect-[840/577.22] max-h-[577.22px] bg-gradient-to-b from-[#EAEAEF] via-[#E2E2E8] to-[#D5D5DC] rounded-[24px] sm:rounded-[36px] md:rounded-[40px] p-3 sm:p-5 md:p-6 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.18)] border border-black/10 flex flex-col justify-between"
         >
           {/* Subtle glossy bevel highlight inside lid */}
-          <div className="absolute inset-0 rounded-[28px] sm:rounded-[44px] border border-white/70 pointer-events-none" />
+          <div className="absolute inset-0 rounded-[24px] sm:rounded-[36px] md:rounded-[40px] border border-white/70 pointer-events-none" />
 
-          {/* GRID LAYOUT */}
-          <div className="flex flex-col gap-3 sm:gap-5 md:gap-6 w-full">
+          {/* GRID LAYOUT - 3 Rows exactly filling the 840x577 lid */}
+          <div className="flex flex-col justify-between gap-2.5 sm:gap-3.5 md:gap-4 w-full h-full">
             {/* ROW 1: 3 BÜYÜK / LARGE SLOTS */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-5 md:gap-6 h-28 sm:h-40 md:h-52">
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5 md:gap-4 flex-1">
               <SlotCard
                 slot={slot1}
                 isSelected={selectedSlot?.id === slot1.id}
@@ -158,7 +158,7 @@ export default function MacBookDisplay() {
             </div>
 
             {/* ROW 2: 2 KÜÇÜK / SMALL + CENTER LOGO + 2 KÜÇÜK / SMALL */}
-            <div className="grid grid-cols-5 gap-2.5 sm:gap-4 md:gap-5 h-28 sm:h-40 md:h-52 items-stretch">
+            <div className="grid grid-cols-5 gap-2 sm:gap-3 md:gap-3.5 flex-1 items-stretch">
               <SlotCard
                 slot={slot4}
                 isSelected={selectedSlot?.id === slot4.id}
@@ -175,8 +175,8 @@ export default function MacBookDisplay() {
               />
 
               {/* CENTER APPLE LOGO */}
-              <div className="flex items-center justify-center p-2 sm:p-4">
-                <AppleLogo className="w-12 h-12 sm:w-20 sm:h-20 md:w-24 md:h-24 text-[#3A3A3C] drop-shadow-sm transition-transform hover:scale-105" />
+              <div className="flex items-center justify-center p-1 sm:p-2">
+                <AppleLogo className="w-10 h-10 sm:w-16 sm:h-16 md:w-20 md:h-20 text-[#3A3A3C] drop-shadow-sm transition-transform hover:scale-105" />
               </div>
 
               <SlotCard
@@ -196,7 +196,7 @@ export default function MacBookDisplay() {
             </div>
 
             {/* ROW 3: 3 ORTA / MEDIUM SLOTS */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-5 md:gap-6 h-28 sm:h-40 md:h-52">
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5 md:gap-4 flex-1">
               <SlotCard
                 slot={slot8}
                 isSelected={selectedSlot?.id === slot8.id}
