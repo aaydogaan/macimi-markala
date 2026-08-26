@@ -89,41 +89,38 @@ export default function MacBookDisplay() {
     };
   }, [updateDimensions, viewMode]);
 
-  // Load saved logos from localStorage and Supabase on mount
+  // Load confirmed sponsors strictly from Supabase (clearing legacy test cache)
   useEffect(() => {
-    // 1. LocalStorage
+    // Clear old mock/test local cache so the board is clean and real
     try {
-      const saved = localStorage.getItem("mac_uploaded_logos");
-      if (saved) {
-        setUploadedLogos(JSON.parse(saved));
-      }
+      localStorage.removeItem("mac_uploaded_logos");
     } catch {
       // ignore
     }
 
-    // 2. Fetch from Supabase
+    // Fetch verified sponsor logos from Supabase
     const loadSupabaseLogos = async () => {
       try {
         const { fetchLiveReservations } = await import("@/services/supabaseService");
         const liveMap = await fetchLiveReservations();
         if (liveMap && Object.keys(liveMap).length > 0) {
-          setUploadedLogos((prev) => {
-            const merged = { ...prev };
-            for (const [id, val] of Object.entries(liveMap)) {
-              if (val.logoUrl) {
-                merged[id] = val.logoUrl;
-              }
+          const map: Record<string, string> = {};
+          for (const [id, val] of Object.entries(liveMap)) {
+            if (val.logoUrl) {
+              map[id] = val.logoUrl;
             }
-            return merged;
-          });
+          }
+          setUploadedLogos(map);
+        } else {
+          setUploadedLogos({});
         }
       } catch {
-        // ignore
+        setUploadedLogos({});
       }
     };
     loadSupabaseLogos();
 
-    // 3. Realtime subscription
+    // Realtime subscription for live purchases
     let unsubscribe: (() => void) | undefined;
     import("@/services/supabaseService").then(({ subscribeToReservations }) => {
       unsubscribe = subscribeToReservations(() => {
@@ -144,13 +141,17 @@ export default function MacBookDisplay() {
       } else {
         delete updated[slotId];
       }
-      try {
-        localStorage.setItem("mac_uploaded_logos", JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
       return updated;
     });
+  };
+
+  const handleClearDrafts = () => {
+    setUploadedLogos({});
+    try {
+      localStorage.removeItem("mac_uploaded_logos");
+    } catch {
+      // ignore
+    }
   };
 
   const handleSlotClick = (slot: AdSlotType) => {
