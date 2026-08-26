@@ -28,7 +28,10 @@ interface Translations {
     fromPrefix: string;
     fromSuffix: string;
     preview: string;
-    hint: string;
+    liveTab: string;
+    finalTab: string;
+    liveHint: string;
+    finalHint: string;
   };
   panel: {
     availableSlot: string;
@@ -129,7 +132,10 @@ export const translations: Record<Language, Translations> = {
       fromPrefix: "$",
       fromSuffix: "'den",
       preview: "Önizleme",
-      hint: "Detayları incelemek ve markanızı yerleştirmek için bir alana tıklayın",
+      liveTab: "Canlı Alanlar",
+      finalTab: "Son Görünüm",
+      liveHint: "Yerinizi seçmek için bir alana tıklayın.",
+      finalHint: "Tüm reklam alanları tamamlandığında MacBook'un gerçek görünümü.",
     },
     panel: {
       availableSlot: "Müsait Alan",
@@ -273,7 +279,10 @@ export const translations: Record<Language, Translations> = {
       fromPrefix: "from $",
       fromSuffix: "",
       preview: "Preview",
-      hint: "Click any slot to inspect details and preview your logo",
+      liveTab: "Live auction",
+      finalTab: "Final look",
+      liveHint: "Tap any spot to place a bid.",
+      finalHint: "How the MacBook will look with all sponsor stickers applied.",
     },
     panel: {
       availableSlot: "Available Slot",
