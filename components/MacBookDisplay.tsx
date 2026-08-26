@@ -1,11 +1,58 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import { adSlots, AdSlot as AdSlotType } from "@/data/adSlots";
 import { useLanguage } from "@/context/LanguageContext";
 import AdSlotPanel from "./AdSlotPanel";
+
+// Exact corner percentages from original brandmymac.com
+const CORNER_TOP_LEFT = [33.67, 16.4];
+const CORNER_TOP_RIGHT = [97.05, 1.75];
+const CORNER_BOT_RIGHT = [91.18, 74.3];
+const CORNER_BOT_LEFT = [28.66, 96.39];
+
+// 2D Perspective Projection (Homography) to 3D CSS Matrix3D transform
+function getHomographyMatrix(width: number, height: number): string | undefined {
+  if (!width || !height) return undefined;
+
+  const [i, n] = [(CORNER_TOP_LEFT[0] / 100) * width, (CORNER_TOP_LEFT[1] / 100) * height];
+  const [a, o] = [(CORNER_TOP_RIGHT[0] / 100) * width, (CORNER_TOP_RIGHT[1] / 100) * height];
+  const [l, h] = [(CORNER_BOT_RIGHT[0] / 100) * width, (CORNER_BOT_RIGHT[1] / 100) * height];
+  const [u, c] = [(CORNER_BOT_LEFT[0] / 100) * width, (CORNER_BOT_LEFT[1] / 100) * height];
+
+  const d = a - l;
+  const p = u - l;
+  const f = i - a + l - u;
+  const m = o - h;
+  const g = c - h;
+  const y = n - o + h - c;
+
+  const b = d * g - p * m;
+  const v = b ? (f * g - p * y) / b : 0;
+  const w = b ? (d * y - f * m) / b : 0;
+
+  const matrix = [
+    (a - i + v * a) / 1000,
+    (o - n + v * o) / 1000,
+    0,
+    v / 1000,
+    (u - i + w * u) / 700,
+    (c - n + w * c) / 700,
+    0,
+    w / 700,
+    0,
+    0,
+    1,
+    0,
+    i,
+    n,
+    0,
+    1,
+  ];
+
+  return `matrix3d(${matrix.map((num) => +num.toFixed(6)).join(",")})`;
+}
 
 export default function MacBookDisplay() {
   const { t, language } = useLanguage();
@@ -15,8 +62,36 @@ export default function MacBookDisplay() {
   // Persistent map of slotId -> logoDataUrl
   const [uploadedLogos, setUploadedLogos] = useState<Record<string, string>>({});
 
-  // Load saved logos from localStorage on mount
+  // Container dimensions for 3D homography calculation
+  const mockupContainerRef = useRef<HTMLDivElement>(null);
+  const [mockupDimensions, setMockupDimensions] = useState({ w: 0, h: 0 });
+
+  const updateDimensions = useCallback(() => {
+    if (!mockupContainerRef.current) return;
+    const { width, height } = mockupContainerRef.current.getBoundingClientRect();
+    setMockupDimensions((prev) => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
+  }, []);
+
   useEffect(() => {
+    updateDimensions();
+    const container = mockupContainerRef.current;
+    if (!container) return;
+
+    const ro = new ResizeObserver(() => {
+      updateDimensions();
+    });
+    ro.observe(container);
+    window.addEventListener("resize", updateDimensions);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", updateDimensions);
+    };
+  }, [updateDimensions, viewMode]);
+
+  // Load saved logos from localStorage and Supabase on mount
+  useEffect(() => {
+    // 1. LocalStorage
     try {
       const saved = localStorage.getItem("mac_uploaded_logos");
       if (saved) {
@@ -25,6 +100,40 @@ export default function MacBookDisplay() {
     } catch {
       // ignore
     }
+
+    // 2. Fetch from Supabase
+    const loadSupabaseLogos = async () => {
+      try {
+        const { fetchLiveReservations } = await import("@/services/supabaseService");
+        const liveMap = await fetchLiveReservations();
+        if (liveMap && Object.keys(liveMap).length > 0) {
+          setUploadedLogos((prev) => {
+            const merged = { ...prev };
+            for (const [id, val] of Object.entries(liveMap)) {
+              if (val.logoUrl) {
+                merged[id] = val.logoUrl;
+              }
+            }
+            return merged;
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadSupabaseLogos();
+
+    // 3. Realtime subscription
+    let unsubscribe: (() => void) | undefined;
+    import("@/services/supabaseService").then(({ subscribeToReservations }) => {
+      unsubscribe = subscribeToReservations(() => {
+        loadSupabaseLogos();
+      });
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
   }, []);
 
   const handleLogoUpload = (slotId: string, dataUrl: string | null) => {
@@ -52,21 +161,8 @@ export default function MacBookDisplay() {
     setSelectedSlot(null);
   };
 
-  // Spot placement grid areas (Exact 6-column, 3-row grid layout from original site)
-  const spotGridAreas: Record<string, string> = {
-    "slot-1": "1 / 1 / auto / span 2",
-    "slot-2": "1 / 3 / auto / span 2",
-    "slot-3": "1 / 5 / auto / span 2",
-    "slot-4": "2 / 1 / auto / span 1",
-    "slot-5": "2 / 2 / auto / span 1",
-    "slot-6": "2 / 5 / auto / span 1",
-    "slot-7": "2 / 6 / auto / span 1",
-    "slot-8": "3 / 1 / auto / span 2",
-    "slot-9": "3 / 3 / auto / span 2",
-    "slot-10": "3 / 5 / auto / span 2",
-  };
-
   const selectLabel = language === "tr" ? "Seç" : "Select";
+  const matrix3dTransform = getHomographyMatrix(mockupDimensions.w, mockupDimensions.h);
 
   return (
     <section className="relative px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24 flex flex-col items-center" id="macbook-display">
@@ -75,14 +171,14 @@ export default function MacBookDisplay() {
         <div className="relative w-full aspect-[1.44] flex items-center justify-center">
           <AnimatePresence mode="wait">
             {viewMode === "live" ? (
-              /* LIVE AUCTION / INTERACTIVE GRID */
+              /* LIVE AUCTION / INTERACTIVE 16-SLOT GRID */
               <motion.div
                 key="live-lid"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.3 }}
-                className="relative w-full h-full rounded-[18px] p-[10px] sm:rounded-[22px]"
+                className="relative w-full h-full rounded-[18px] p-[8px] sm:rounded-[22px] sm:p-[12px]"
                 style={{
                   aspectRatio: "1.44",
                   background:
@@ -117,9 +213,9 @@ export default function MacBookDisplay() {
                   </div>
                 </div>
 
-                {/* 6-Column, 3-Row Grid System from original site */}
+                {/* 6-Column, 3-Row Grid System (16 Slots: 6 Top, 4 Mid, 6 Bottom) */}
                 <div
-                  className="relative grid h-full gap-2 p-2 sm:gap-3 sm:p-4"
+                  className="relative grid h-full gap-1.5 p-1 sm:gap-2.5 sm:p-2"
                   style={{
                     gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
                     gridTemplateRows: "minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1fr)",
@@ -140,13 +236,13 @@ export default function MacBookDisplay() {
                     return (
                       <div
                         key={slot.id}
-                        style={{ gridArea: spotGridAreas[slot.id] }}
+                        style={{ gridColumn: `${slot.col} / span ${slot.colSpan}`, gridRow: slot.row }}
                         className="h-full w-full"
                       >
                         <button
                           type="button"
                           onClick={() => handleSlotClick(slot)}
-                          className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-dashed transition-all duration-200 cursor-pointer ${
+                          className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg sm:rounded-xl border border-dashed transition-all duration-200 cursor-pointer ${
                             isSelected
                               ? "border-blue-600 bg-blue-50/40 ring-2 ring-blue-600 shadow-md z-20"
                               : slotLogo
@@ -155,30 +251,28 @@ export default function MacBookDisplay() {
                           }`}
                         >
                           {/* Slot content */}
-                          <span className="flex h-full w-full flex-col items-center justify-center gap-1 px-1.5 py-2 transition duration-200 group-hover:blur-[2px] group-focus-visible:blur-[2px]">
+                          <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 sm:px-1.5 sm:py-1.5 transition duration-200 group-hover:blur-[2px] group-focus-visible:blur-[2px]">
                             {slotLogo ? (
-                              <span className="relative flex min-h-0 w-full flex-1 items-center justify-center p-1">
+                              <span className="relative flex min-h-0 w-full flex-1 items-center justify-center p-0.5">
                                 <img
                                   src={slotLogo}
                                   alt="Logo"
-                                  className="max-h-[80%] max-w-[88%] object-contain drop-shadow-xs"
+                                  className="max-h-[82%] max-w-[88%] object-contain drop-shadow-xs"
                                 />
                               </span>
                             ) : isSold ? (
-                              <span className="relative flex min-h-0 w-full flex-1 items-center justify-center p-1">
-                                <span className="font-bold text-xs sm:text-sm text-black">
+                              <span className="relative flex min-h-0 w-full flex-1 items-center justify-center p-0.5">
+                                <span className="font-bold text-[11px] sm:text-xs text-black">
                                   {slot.brand}
                                 </span>
                               </span>
                             ) : (
-                              <span className="flex flex-col items-center justify-center gap-1">
-                                <span className="text-[10px] sm:text-[12px] font-semibold tracking-wider text-black/50 uppercase">
+                              <span className="flex flex-col items-center justify-center">
+                                <span className="text-[9px] sm:text-[11px] font-semibold tracking-wider text-black/45 uppercase leading-none">
                                   {sizeText}
                                 </span>
-                                <span className="shrink-0 text-[12px] sm:text-[15px] font-semibold tabular-nums leading-tight text-black/90">
-                                  {t.macbook.fromPrefix}
-                                  {slot.price.toLocaleString("en-US")}
-                                  {t.macbook.fromSuffix}
+                                <span className="shrink-0 text-[11px] sm:text-[14px] font-semibold tabular-nums leading-tight text-black/90 mt-0.5">
+                                  ${slot.price}
                                 </span>
                               </span>
                             )}
@@ -189,7 +283,7 @@ export default function MacBookDisplay() {
                             aria-hidden="true"
                             className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
                           >
-                            <span className="rounded-full px-3 py-1.5 text-[11px] font-medium text-white sm:px-4 sm:text-[13px] bg-blue-600 shadow-sm">
+                            <span className="rounded-full px-2.5 py-1 text-[10px] font-medium text-white sm:px-3.5 sm:text-[12px] bg-blue-600 shadow-sm">
                               {slotLogo ? (language === "tr" ? "Düzenle" : "Edit") : selectLabel}
                             </span>
                           </span>
@@ -200,23 +294,85 @@ export default function MacBookDisplay() {
                 </div>
               </motion.div>
             ) : (
-              /* FINAL 3D MOCKUP LOOK (macbook.webp) */
+              /* EXACT MATHEMATICAL 3D HOMOGRAPHY PERSPECTIVE (16 Slots) */
               <motion.div
                 key="final-look"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.3 }}
-                className="relative w-full h-full flex items-center justify-center rounded-[18px] sm:rounded-[22px] overflow-hidden p-2"
+                ref={mockupContainerRef}
+                className="relative w-full h-full flex items-center justify-center overflow-hidden select-none"
               >
-                <div className="relative w-full h-full max-h-full aspect-[16/9]">
-                  <Image
-                    src="/images/macbook.webp"
-                    alt="MacBook Final Look Mockup"
-                    fill
-                    className="object-contain drop-shadow-xl"
-                    priority
-                  />
+                {/* Background 3D MacBook Pro Image */}
+                <img
+                  src="/images/macbook.webp"
+                  alt="A MacBook Pro seen from behind"
+                  className="block h-auto w-full max-h-full object-contain pointer-events-none drop-shadow-2xl"
+                  onLoad={updateDimensions}
+                />
+
+                {/* Mathematical Matrix3D Homography Plane (1000px by 700px exactly mapped to lid) */}
+                <div
+                  aria-hidden={!matrix3dTransform}
+                  className="pointer-events-none absolute left-0 top-0 origin-top-left z-20"
+                  style={{
+                    width: 1000,
+                    height: 700,
+                    transform: matrix3dTransform,
+                    opacity: matrix3dTransform ? 1 : 0,
+                  }}
+                >
+                  <div
+                    className="grid h-full w-full gap-4 p-7"
+                    style={{
+                      gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+                      gridTemplateRows: "minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1fr)",
+                    }}
+                  >
+                    {adSlots.map((slot) => {
+                      const customLogo = uploadedLogos[slot.id];
+                      // Inner middle slots offset slightly around Apple logo
+                      const translateX = slot.row !== 2 ? 0 : slot.col <= 2 ? 20 : -20;
+
+                      if (!customLogo) {
+                        return (
+                          <div
+                            key={slot.id}
+                            style={{
+                              gridColumn: `${slot.col} / span ${slot.colSpan}`,
+                              gridRow: slot.row,
+                              transform: translateX ? `translateX(${translateX}%)` : undefined,
+                            }}
+                          />
+                        );
+                      }
+
+                      const maxH = slot.sizeLabel === "BÜYÜK" ? 160 : slot.sizeLabel === "ORTA" ? 135 : 120;
+
+                      return (
+                        <div
+                          key={slot.id}
+                          style={{
+                            gridColumn: `${slot.col} / span ${slot.colSpan}`,
+                            gridRow: slot.row,
+                            transform: translateX ? `translateX(${translateX}%)` : undefined,
+                          }}
+                          className="flex flex-col items-center justify-center gap-1"
+                        >
+                          <img
+                            src={customLogo}
+                            alt="Sticker Logo"
+                            style={{
+                              maxHeight: `${maxH}px`,
+                              maxWidth: "90%",
+                            }}
+                            className="w-auto shrink-0 object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </motion.div>
             )}
