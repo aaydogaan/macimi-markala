@@ -49,12 +49,25 @@ export default function AdSlotPanel({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 1. Instant 0ms Preview via FileReader
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const localUrl = ev.target?.result as string;
+      if (localUrl) {
+        onLogoUpload(localUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+
+    // 2. Background Upload to Supabase Storage
     setIsUploading(true);
     try {
       const publicUrl = await uploadLogoToSupabase(file, slot.id);
-      onLogoUpload(publicUrl);
+      if (publicUrl) {
+        onLogoUpload(publicUrl);
+      }
     } catch (err) {
-      console.error("Logo upload error:", err);
+      console.warn("Background upload notice:", err);
     } finally {
       setIsUploading(false);
     }
