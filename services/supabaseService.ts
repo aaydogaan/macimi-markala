@@ -110,13 +110,12 @@ export async function fetchLiveReservations(): Promise<Record<string, { logoUrl:
 /**
  * Subscribes to realtime updates for the reservations table.
  */
-export function subscribeToReservations(
-  onUpdate: (payload: any) => void
-) {
+export function subscribeToReservations(onUpdate: (payload: any) => void) {
   const supabase = createClient();
+  const channelName = `reservations-${Math.random().toString(36).substring(2, 9)}`;
 
   const channel = supabase
-    .channel("realtime-reservations")
+    .channel(channelName)
     .on(
       "postgres_changes",
       {
@@ -127,8 +126,9 @@ export function subscribeToReservations(
       (payload) => {
         onUpdate(payload);
       }
-    )
-    .subscribe();
+    );
+
+  channel.subscribe();
 
   return () => {
     supabase.removeChannel(channel);
