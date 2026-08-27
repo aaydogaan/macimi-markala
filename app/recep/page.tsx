@@ -325,31 +325,39 @@ export default function RecepAdminPage() {
                           <div className="flex sm:flex-col items-end gap-2 w-full sm:w-auto justify-between">
                             <span
                               className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                isSold
+                                item.status === "sold"
                                   ? "bg-emerald-600 text-white"
+                                  : item.status === "confirmed"
+                                  ? "bg-blue-600 text-white"
                                   : isPending
                                   ? "bg-amber-500 text-white"
                                   : "bg-red-500 text-white"
                               }`}
                             >
-                              {isSold ? "KAPAKTA YAYINDA (SATILDI)" : isPending ? "ÖDEME BEKLİYOR" : "REDDEDİLDİ"}
+                              {item.status === "sold"
+                                ? "KAPAKTA YAYINDA (SATILDI)"
+                                : item.status === "confirmed"
+                                ? "🟢 SHOPİER ÖDENDİ (ONAY BEKLİYOR)"
+                                : isPending
+                                ? "🟡 ÖDEME BEKLİYOR"
+                                : "REDDEDİLDİ"}
                             </span>
 
                             <div className="flex items-center gap-1.5 mt-1">
                               {item.id && (
                                 <>
-                                  {!isSold && (
+                                  {item.status !== "sold" && (
                                     <button
                                       disabled={isActionLoading}
                                       onClick={() => handleStatusChange(item.id!, "sold")}
-                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer shadow-sm"
                                       title="Ödemesi alındı, kapağa kilitle"
                                     >
-                                      <CheckCircle size={14} /> Onayla (Kapağa Bas)
+                                      <CheckCircle size={14} /> Kapağa Bas & Kilitle
                                     </button>
                                   )}
 
-                                  {isSold && (
+                                  {item.status === "sold" && (
                                     <button
                                       disabled={isActionLoading}
                                       onClick={() => handleStatusChange(item.id!, "pending")}
