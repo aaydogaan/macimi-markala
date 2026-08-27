@@ -214,8 +214,8 @@ export default function MacBookDisplay() {
                   {adSlots.map((slot) => {
                     const isSelected = selectedSlot?.id === slot.id;
                     const verifiedSponsor = liveSponsors[slot.id];
-                    const activeLogo = verifiedSponsor?.logoUrl || uploadedLogos[slot.id];
                     const isSold = Boolean(verifiedSponsor) || slot.status === "sold";
+                    const confirmedLogo = verifiedSponsor?.logoUrl;
 
                     const sizeText =
                       slot.sizeLabel === "BÜYÜK"
@@ -238,17 +238,15 @@ export default function MacBookDisplay() {
                               ? "border-black/20 bg-white/90 shadow-xs"
                               : isSelected
                               ? "border-blue-600 bg-blue-50/40 ring-2 ring-blue-600 shadow-md z-20"
-                              : activeLogo
-                              ? "border-black/35 bg-white/70 shadow-xs border-dashed"
                               : "border-black/25 bg-black/[0.02] hover:border-black/45 hover:bg-black/[0.04] border-dashed"
                           }`}
                         >
                           {/* Slot content */}
                           <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 sm:px-1.5 sm:py-1.5 transition duration-200 group-hover:blur-[2px] group-focus-visible:blur-[2px]">
-                            {activeLogo ? (
+                            {confirmedLogo ? (
                               <span className="relative flex min-h-0 w-full flex-1 items-center justify-center p-0.5">
                                 <img
-                                  src={activeLogo}
+                                  src={confirmedLogo}
                                   alt="Logo"
                                   className="max-h-[82%] max-w-[88%] object-contain drop-shadow-xs"
                                 />
@@ -279,7 +277,7 @@ export default function MacBookDisplay() {
                             <span className={`rounded-full px-2.5 py-1 text-[10px] font-medium text-white sm:px-3.5 sm:text-[12px] shadow-sm ${
                               isSold ? "bg-emerald-600" : "bg-blue-600"
                             }`}>
-                              {isSold ? (language === "tr" ? "İncele" : "Details") : activeLogo ? (language === "tr" ? "Düzenle" : "Edit") : selectLabel}
+                              {isSold ? (language === "tr" ? "İncele" : "Details") : selectLabel}
                             </span>
                           </span>
                         </button>
@@ -327,7 +325,7 @@ export default function MacBookDisplay() {
                   >
                     {adSlots.map((slot) => {
                       const verifiedSponsor = liveSponsors[slot.id];
-                      const customLogo = verifiedSponsor?.logoUrl || uploadedLogos[slot.id];
+                      const customLogo = verifiedSponsor?.logoUrl;
                       // Inner middle slots offset slightly around Apple logo
                       const translateX = slot.row !== 2 ? 0 : slot.col <= 2 ? 20 : -20;
 

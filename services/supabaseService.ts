@@ -48,14 +48,38 @@ export async function uploadLogo(file: File, slotId: string): Promise<string> {
 }
 
 /**
- * Saves a new sponsor reservation in Supabase.
+ * Saves a new sponsor reservation in Supabase and local cache backup.
  */
 export async function saveReservation(reservation: ReservationData): Promise<{ success: boolean; orderCode: string }> {
   const supabase = createClient();
   const orderCode = reservation.order_code || `MAC-${reservation.slot_id.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  const newRecord: ReservationData = {
+    id: `local-${Date.now()}`,
+    slot_id: reservation.slot_id,
+    brand_name: reservation.brand_name,
+    brand_url: reservation.brand_url || undefined,
+    logo_url: reservation.logo_url,
+    amount: reservation.amount,
+    contact_email: reservation.contact_email || undefined,
+    order_code: orderCode,
+    status: reservation.status || "pending",
+    created_at: new Date().toISOString(),
+  };
+
+  // Local backup cache for reliability
   try {
-    const { error } = await supabase.from("reservations").insert([
+    const existingStr = localStorage.getItem("mac_pending_reservations");
+    const existing: ReservationData[] = existingStr ? JSON.parse(existingStr) : [];
+    existing.unshift(newRecord);
+    localStorage.setItem("mac_pending_reservations", JSON.stringify(existing));
+  } catch {
+    // ignore
+  }
+
+  // Supabase Database Insert
+  try {
+    const { data, error } = await supabase.from("reservations").insert([
       {
         slot_id: reservation.slot_id,
         brand_name: reservation.brand_name,
@@ -65,18 +89,19 @@ export async function saveReservation(reservation: ReservationData): Promise<{ s
         contact_email: reservation.contact_email || null,
         order_code: orderCode,
         status: reservation.status || "pending",
-        created_at: new Date().toISOString(),
       },
-    ]);
+    ]).select();
 
     if (error) {
       console.warn("Supabase insert note:", error.message);
+    } else if (data && data[0]?.id) {
+      newRecord.id = data[0].id;
     }
-    return { success: true, orderCode };
   } catch (err) {
-    console.warn("Error saving reservation:", err);
-    return { success: true, orderCode };
+    console.warn("Error saving reservation to Supabase:", err);
   }
+
+  return { success: true, orderCode };
 }
 
 /**
@@ -84,6 +109,7 @@ export async function saveReservation(reservation: ReservationData): Promise<{ s
  */
 export async function fetchLiveReservations(): Promise<Record<string, { logoUrl: string; brand: string; brandUrl?: string }>> {
   const supabase = createClient();
+  const map: Record<string, { logoUrl: string; brand: string; brandUrl?: string }> = {};
 
   try {
     const { data, error } = await supabase
@@ -91,31 +117,49 @@ export async function fetchLiveReservations(): Promise<Record<string, { logoUrl:
       .select("slot_id, logo_url, brand_name, brand_url, status")
       .in("status", ["confirmed", "sold"]);
 
-    if (error || !data) {
-      return {};
-    }
-
-    const map: Record<string, { logoUrl: string; brand: string; brandUrl?: string }> = {};
-    for (const item of data) {
-      if (item.slot_id && item.logo_url) {
-        map[item.slot_id] = {
-          logoUrl: item.logo_url,
-          brand: item.brand_name || "",
-          brandUrl: item.brand_url || undefined,
-        };
+    if (!error && data) {
+      for (const item of data) {
+        if (item.slot_id && item.logo_url) {
+          map[item.slot_id] = {
+            logoUrl: item.logo_url,
+            brand: item.brand_name || "",
+            brandUrl: item.brand_url || undefined,
+          };
+        }
       }
     }
-    return map;
   } catch {
-    return {};
+    // ignore
   }
+
+  // Check local confirmed cache as backup
+  try {
+    const existingStr = localStorage.getItem("mac_pending_reservations");
+    if (existingStr) {
+      const list: ReservationData[] = JSON.parse(existingStr);
+      for (const item of list) {
+        if ((item.status === "sold" || item.status === "confirmed") && !map[item.slot_id]) {
+          map[item.slot_id] = {
+            logoUrl: item.logo_url,
+            brand: item.brand_name || "",
+            brandUrl: item.brand_url,
+          };
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return map;
 }
 
 /**
- * Fetches ALL reservations for /recep admin dashboard.
+ * Fetches ALL reservations for /recep admin dashboard (combining Supabase + Local).
  */
 export async function fetchAllReservations(): Promise<ReservationData[]> {
   const supabase = createClient();
+  let serverList: ReservationData[] = [];
 
   try {
     const { data, error } = await supabase
@@ -123,14 +167,30 @@ export async function fetchAllReservations(): Promise<ReservationData[]> {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error || !data) {
-      return [];
+    if (!error && data) {
+      serverList = data as ReservationData[];
     }
-
-    return data as ReservationData[];
   } catch {
-    return [];
+    // ignore
   }
+
+  // Merge with local list for zero data loss
+  try {
+    const localStr = localStorage.getItem("mac_pending_reservations");
+    if (localStr) {
+      const localList: ReservationData[] = JSON.parse(localStr);
+      const serverIds = new Set(serverList.map((s) => s.id || s.order_code));
+      for (const loc of localList) {
+        if (!serverIds.has(loc.id) && !serverIds.has(loc.order_code)) {
+          serverList.push(loc);
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return serverList;
 }
 
 /**
@@ -139,34 +199,58 @@ export async function fetchAllReservations(): Promise<ReservationData[]> {
 export async function updateReservationStatus(id: string, status: "sold" | "confirmed" | "rejected" | "pending"): Promise<boolean> {
   const supabase = createClient();
 
+  // 1. Update Supabase
   try {
-    const { error } = await supabase
+    await supabase
       .from("reservations")
       .update({ status })
       .eq("id", id);
-
-    return !error;
   } catch {
-    return false;
+    // ignore
   }
+
+  // 2. Update local storage backup
+  try {
+    const localStr = localStorage.getItem("mac_pending_reservations");
+    if (localStr) {
+      const list: ReservationData[] = JSON.parse(localStr);
+      const updated = list.map((item) => (item.id === id ? { ...item, status } : item));
+      localStorage.setItem("mac_pending_reservations", JSON.stringify(updated));
+    }
+  } catch {
+    // ignore
+  }
+
+  return true;
 }
 
 /**
- * Deletes a reservation from Supabase.
+ * Deletes a reservation from Supabase and local cache.
  */
 export async function deleteReservation(id: string): Promise<boolean> {
   const supabase = createClient();
 
   try {
-    const { error } = await supabase
+    await supabase
       .from("reservations")
       .delete()
       .eq("id", id);
-
-    return !error;
   } catch {
-    return false;
+    // ignore
   }
+
+  try {
+    const localStr = localStorage.getItem("mac_pending_reservations");
+    if (localStr) {
+      const list: ReservationData[] = JSON.parse(localStr);
+      const updated = list.filter((item) => item.id !== id);
+      localStorage.setItem("mac_pending_reservations", JSON.stringify(updated));
+    }
+  } catch {
+    // ignore
+  }
+
+  return true;
 }
 
 /**

@@ -12,24 +12,36 @@ CREATE TABLE IF NOT EXISTS public.reservations (
     logo_url TEXT NOT NULL,
     amount NUMERIC NOT NULL,
     contact_email TEXT,
-    status TEXT NOT NULL DEFAULT 'confirmed', -- 'pending', 'confirmed', 'sold'
+    order_code TEXT,
+    status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'confirmed', 'sold', 'rejected'
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Eğer tablo önceden oluşturulduysa order_code kolonunu garanti ekleyelim:
+ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS order_code TEXT;
 
 -- RLS (Row Level Security) Etkinleştirme
 ALTER TABLE public.reservations ENABLE ROW LEVEL SECURITY;
 
--- Herkesin onaylanmış rezervasyonları okuyabilmesi için kural
-CREATE POLICY "Public can view confirmed reservations"
-ON public.reservations
-FOR SELECT
+-- Okuma (Herkes görebilir)
+CREATE POLICY "Public can view reservations"
+ON public.reservations FOR SELECT
 USING (true);
 
--- Herkesin yeni rezervasyon talebi oluşturabilmesi için kural
+-- Ekleme (Müşteriler sipariş oluşturabilir)
 CREATE POLICY "Public can insert reservations"
-ON public.reservations
-FOR INSERT
+ON public.reservations FOR INSERT
 WITH CHECK (true);
+
+-- Güncelleme (Admin panel onaylayabilir)
+CREATE POLICY "Public can update reservations"
+ON public.reservations FOR UPDATE
+USING (true);
+
+-- Silme (Admin panel silebilir)
+CREATE POLICY "Public can delete reservations"
+ON public.reservations FOR DELETE
+USING (true);
 
 -- Realtime yayını etkinleştirme
 ALTER PUBLICATION supabase_realtime ADD TABLE public.reservations;
