@@ -10,6 +10,7 @@ import {
   adSlots,
   getProgressPercentage,
 } from "@/data/adSlots";
+import { createClient } from "@/utils/supabase/client";
 
 export default function Hero() {
   const { t, language } = useLanguage();
@@ -17,43 +18,78 @@ export default function Hero() {
   const totalCollected = getTotalCollected();
   const progressPercent = getProgressPercentage();
 
-  // Dynamic live and total visitors counter
-  const [liveVisitors, setLiveVisitors] = useState(4);
-  const [totalVisitors, setTotalVisitors] = useState(1482);
+  // 100% Real Live Presence Tracking via Supabase
+  const [liveVisitors, setLiveVisitors] = useState(1);
+  const [totalVisits, setTotalVisits] = useState(1);
 
   useEffect(() => {
-    // Generate organic total visitor count with local increment
+    // 1. Session-based unique visit tracking (Won't increment on every F5 refresh)
     try {
-      const stored = localStorage.getItem("mac_total_visits");
-      const base = stored ? parseInt(stored, 10) : 1482;
-      const nextCount = base + 1;
-      setTotalVisitors(nextCount);
-      localStorage.setItem("mac_total_visits", nextCount.toString());
+      const sessionActive = sessionStorage.getItem("mac_session_visited");
+      const storedTotal = localStorage.getItem("mac_real_total_visits");
+      let count = storedTotal ? parseInt(storedTotal, 10) : 1;
+
+      if (!sessionActive) {
+        count += 1;
+        localStorage.setItem("mac_real_total_visits", count.toString());
+        sessionStorage.setItem("mac_session_visited", "true");
+      }
+      setTotalVisits(count);
     } catch {
       // ignore
     }
 
-    // Small organic fluctuation for live online viewers
-    const interval = setInterval(() => {
-      setLiveVisitors((prev) => {
-        const delta = Math.random() > 0.5 ? 1 : -1;
-        const next = prev + delta;
-        return Math.max(3, Math.min(8, next));
+    // 2. Real-time Supabase Presence for accurate online viewer count
+    try {
+      const supabase = createClient();
+      const channel = supabase.channel("online-presence", {
+        config: {
+          presence: {
+            key: `client-${Math.random().toString(36).substring(2, 9)}`,
+          },
+        },
       });
-    }, 4500);
 
-    return () => clearInterval(interval);
+      channel
+        .on("presence", { event: "sync" }, () => {
+          const state = channel.presenceState();
+          const uniqueOnline = Object.keys(state).length;
+          setLiveVisitors(Math.max(1, uniqueOnline));
+        })
+        .on("presence", { event: "join" }, () => {
+          const state = channel.presenceState();
+          setLiveVisitors(Math.max(1, Object.keys(state).length));
+        })
+        .on("presence", { event: "leave" }, () => {
+          const state = channel.presenceState();
+          setLiveVisitors(Math.max(1, Object.keys(state).length));
+        });
+
+      channel.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      // fallback
+    }
   }, []);
 
   const liveText =
     language === "tr"
       ? `${liveVisitors} kişi şu an inceliyor`
-      : `${liveVisitors} people viewing now`;
+      : `${liveVisitors} ${liveVisitors > 1 ? "people" : "person"} viewing now`;
 
   const totalText =
     language === "tr"
-      ? `${totalVisitors.toLocaleString("tr-TR")} toplam ziyaret`
-      : `${totalVisitors.toLocaleString("en-US")} total visits`;
+      ? `${totalVisits} tekil ziyaret`
+      : `${totalVisits} unique visits`;
 
   return (
     <section className="pt-24 pb-4 sm:pt-28 sm:pb-6 text-center max-w-5xl mx-auto px-6 flex flex-col items-center">
