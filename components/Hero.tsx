@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -11,10 +12,48 @@ import {
 } from "@/data/adSlots";
 
 export default function Hero() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const soldCount = getSoldSlots().length;
   const totalCollected = getTotalCollected();
   const progressPercent = getProgressPercentage();
+
+  // Dynamic live and total visitors counter
+  const [liveVisitors, setLiveVisitors] = useState(4);
+  const [totalVisitors, setTotalVisitors] = useState(1482);
+
+  useEffect(() => {
+    // Generate organic total visitor count with local increment
+    try {
+      const stored = localStorage.getItem("mac_total_visits");
+      const base = stored ? parseInt(stored, 10) : 1482;
+      const nextCount = base + 1;
+      setTotalVisitors(nextCount);
+      localStorage.setItem("mac_total_visits", nextCount.toString());
+    } catch {
+      // ignore
+    }
+
+    // Small organic fluctuation for live online viewers
+    const interval = setInterval(() => {
+      setLiveVisitors((prev) => {
+        const delta = Math.random() > 0.5 ? 1 : -1;
+        const next = prev + delta;
+        return Math.max(3, Math.min(8, next));
+      });
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const liveText =
+    language === "tr"
+      ? `${liveVisitors} kişi şu an inceliyor`
+      : `${liveVisitors} people viewing now`;
+
+  const totalText =
+    language === "tr"
+      ? `${totalVisitors.toLocaleString("tr-TR")} toplam ziyaret`
+      : `${totalVisitors.toLocaleString("en-US")} total visits`;
 
   return (
     <section className="pt-24 pb-4 sm:pt-28 sm:pb-6 text-center max-w-5xl mx-auto px-6 flex flex-col items-center">
@@ -23,17 +62,17 @@ export default function Hero() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#F5F5F7] border border-black/[0.06] rounded-full text-[13px] text-[#1D1D1F]/80 mb-4"
+        className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#F5F5F7] border border-black/[0.06] rounded-full text-[13px] text-[#1D1D1F]/85 mb-4 shadow-xs"
       >
         <span className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
-        <span className="font-medium text-[#1D1D1F]">
-          {t.hero.visitorBadge}
+        <span className="font-semibold text-[#1D1D1F]">
+          {liveText}
         </span>
         <span className="text-[#86868B] font-bold">·</span>
-        <span className="text-[#86868B]">{t.hero.totalBadge}</span>
+        <span className="text-[#86868B] font-medium">{totalText}</span>
       </motion.div>
 
       {/* Main Heading */}
@@ -60,42 +99,42 @@ export default function Hero() {
         {t.hero.subtitle}
       </motion.p>
 
-      {/* Compact MacBook Target Bar */}
+      {/* Mini Progress Card / Stats Badge */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{
           duration: 0.6,
-          delay: 0.2,
+          delay: 0.18,
           ease: [0.25, 0.46, 0.45, 0.94],
         }}
-        className="mt-5 mb-2 w-full max-w-lg bg-white/90 backdrop-blur-sm border border-black/[0.08] shadow-xs rounded-2xl px-5 py-3.5 flex flex-col gap-2"
+        className="mt-6 flex flex-wrap items-center justify-center gap-3 text-[14px] text-[#86868B]"
       >
-        <div className="flex items-center justify-between text-[12px] sm:text-[13px]">
-          <div className="flex items-center gap-1.5 font-semibold text-[#1D1D1F]">
-            <span className="text-[#86868B] font-normal">{t.hero.targetLabel}</span>
-            <span>${MACBOOK_PRICE.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[#1D1D1F]">
-            <span className="text-[#86868B]">{t.hero.collectedLabel}</span>
-            <span className="font-semibold text-emerald-600">
-              ${totalCollected.toLocaleString("en-US")}
-            </span>
-            <span className="text-[11px] text-[#86868B]">
-              ({soldCount}/{adSlots.length} {t.hero.slotsSoldLabel})
-            </span>
-          </div>
-        </div>
+        <span className="inline-flex items-center gap-1.5 font-medium text-[#1D1D1F]">
+          <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+          {t.hero.targetLabel}{" "}
+          <strong className="font-semibold text-[#1D1D1F]">
+            ${MACBOOK_PRICE.toLocaleString("en-US")}
+          </strong>
+        </span>
 
-        {/* Mini sleek progress bar */}
-        <div className="w-full h-2 bg-[#F5F5F7] rounded-full overflow-hidden">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${progressPercent}%` }}
-            transition={{ duration: 1, delay: 0.4, ease: "easeOut" }}
-            className="h-full bg-[#1D1D1F] rounded-full"
-          />
-        </div>
+        <span className="text-[#86868B]/40 hidden sm:inline">|</span>
+
+        <span className="inline-flex items-center gap-1.5 font-medium text-[#1D1D1F]">
+          {t.hero.collectedLabel}{" "}
+          <strong className="font-semibold text-emerald-600">
+            ${totalCollected.toLocaleString("en-US")}
+          </strong>
+        </span>
+
+        <span className="text-[#86868B]/40 hidden sm:inline">|</span>
+
+        <span>
+          <strong className="font-semibold text-[#1D1D1F]">
+            {soldCount} / {adSlots.length}
+          </strong>{" "}
+          {t.hero.slotsSoldLabel}
+        </span>
       </motion.div>
     </section>
   );

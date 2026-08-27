@@ -20,12 +20,17 @@ export default function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-black/[0.06]">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
-          {/* Logo */}
+          {/* Logo with Icon */}
           <a
             href="#"
-            className="text-[15px] font-semibold tracking-tight text-[#1D1D1F]"
+            className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-[#1D1D1F] hover:opacity-80 transition-opacity"
           >
-            {t.header.logo}
+            <img
+              src="/images/logo-small.webp"
+              alt="Mac'imi Markala Logo"
+              className="w-5 h-5 object-contain"
+            />
+            <span>{t.header.logo}</span>
           </a>
 
           {/* Desktop Nav */}

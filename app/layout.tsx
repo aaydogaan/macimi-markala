@@ -29,6 +29,11 @@ export const metadata: Metadata = {
     locale: "tr_TR",
     siteName: "Mac'imi Markala",
   },
+  icons: {
+    icon: "/images/logo-small.webp",
+    shortcut: "/images/logo-small.webp",
+    apple: "/images/logo-small.webp",
+  },
   twitter: {
     card: "summary_large_image",
     title: "Mac'imi Markala",
