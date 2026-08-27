@@ -33,6 +33,7 @@ export const adSlots: AdSlot[] = [
     row: 1,
     col: 1,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273433",
   },
   {
     id: "slot-2",
@@ -46,6 +47,7 @@ export const adSlots: AdSlot[] = [
     row: 1,
     col: 2,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273438",
   },
   {
     id: "slot-3",
@@ -59,6 +61,7 @@ export const adSlots: AdSlot[] = [
     row: 1,
     col: 3,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273440",
   },
   {
     id: "slot-4",
@@ -72,6 +75,7 @@ export const adSlots: AdSlot[] = [
     row: 1,
     col: 4,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273443",
   },
   {
     id: "slot-5",
@@ -85,6 +89,7 @@ export const adSlots: AdSlot[] = [
     row: 1,
     col: 5,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273446",
   },
   {
     id: "slot-6",
@@ -98,6 +103,7 @@ export const adSlots: AdSlot[] = [
     row: 1,
     col: 6,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273450",
   },
 
   // --- ORTA SIRA (4 ALAN: APPLE LOGOSU SOLUNDA 2, SAĞINDA 2: $140, $150, $150, $140) ---
@@ -113,6 +119,7 @@ export const adSlots: AdSlot[] = [
     row: 2,
     col: 1,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273452",
   },
   {
     id: "slot-8",
@@ -126,6 +133,7 @@ export const adSlots: AdSlot[] = [
     row: 2,
     col: 2,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273453",
   },
   {
     id: "slot-9",
@@ -139,6 +147,7 @@ export const adSlots: AdSlot[] = [
     row: 2,
     col: 5,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273454",
   },
   {
     id: "slot-10",
@@ -152,6 +161,7 @@ export const adSlots: AdSlot[] = [
     row: 2,
     col: 6,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273456",
   },
 
   // --- ALT SIRA (6 EŞİT ALAN: $135, $135, $155, $155, $135, $135) ---
@@ -167,6 +177,7 @@ export const adSlots: AdSlot[] = [
     row: 3,
     col: 1,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273458",
   },
   {
     id: "slot-12",
@@ -180,6 +191,7 @@ export const adSlots: AdSlot[] = [
     row: 3,
     col: 2,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273459",
   },
   {
     id: "slot-13",
@@ -193,6 +205,7 @@ export const adSlots: AdSlot[] = [
     row: 3,
     col: 3,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273462",
   },
   {
     id: "slot-14",
@@ -206,6 +219,7 @@ export const adSlots: AdSlot[] = [
     row: 3,
     col: 4,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273463",
   },
   {
     id: "slot-15",
@@ -219,6 +233,7 @@ export const adSlots: AdSlot[] = [
     row: 3,
     col: 5,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273466",
   },
   {
     id: "slot-16",
@@ -232,6 +247,7 @@ export const adSlots: AdSlot[] = [
     row: 3,
     col: 6,
     colSpan: 1,
+    shopierUrl: "https://www.shopier.com/revizelesene/50273467",
   },
 ];
 
@@ -253,4 +269,3 @@ export const getProgressPercentage = (): number => {
   const collected = getTotalCollected();
   return Math.min(Math.round((collected / MACBOOK_PRICE) * 100), 100);
 };
-
