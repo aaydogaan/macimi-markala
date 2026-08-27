@@ -18,28 +18,56 @@ export default function Hero() {
   const totalCollected = getTotalCollected();
   const progressPercent = getProgressPercentage();
 
-  // 100% Real Live Presence Tracking via Supabase
+  // 100% Real Live Presence & Persistent Total Visits Tracking via Supabase
   const [liveVisitors, setLiveVisitors] = useState(1);
-  const [totalVisits, setTotalVisits] = useState(1);
+  const [totalVisits, setTotalVisits] = useState(4);
 
   useEffect(() => {
-    // 1. Session-based unique visit tracking (Won't increment on every F5 refresh)
-    try {
-      const sessionActive = sessionStorage.getItem("mac_session_visited");
-      const storedTotal = localStorage.getItem("mac_real_total_visits");
-      let count = storedTotal ? parseInt(storedTotal, 10) : 1;
+    // 1. Persistent Unique Visitor Tracking via Supabase API
+    const trackVisitor = async () => {
+      try {
+        // Fast initial load from local storage cache if available
+        const cachedTotal = localStorage.getItem("mac_global_total_visits");
+        if (cachedTotal) {
+          const parsed = parseInt(cachedTotal, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            setTotalVisits(parsed);
+          }
+        }
 
-      if (!sessionActive) {
-        count += 1;
-        localStorage.setItem("mac_real_total_visits", count.toString());
-        sessionStorage.setItem("mac_session_visited", "true");
+        const sessionActive = sessionStorage.getItem("mac_session_visited");
+        let res;
+
+        if (!sessionActive) {
+          // New visit in this browser session -> increment counter
+          res = await fetch("/api/stats/visit", {
+            method: "POST",
+            cache: "no-store",
+          });
+          sessionStorage.setItem("mac_session_visited", "true");
+        } else {
+          // Already counted this session -> just fetch latest total
+          res = await fetch("/api/stats/visit", {
+            method: "GET",
+            cache: "no-store",
+          });
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data.total_visits === "number") {
+            setTotalVisits(data.total_visits);
+            localStorage.setItem("mac_global_total_visits", data.total_visits.toString());
+          }
+        }
+      } catch (err) {
+        console.warn("Visitor tracking sync notice:", err);
       }
-      setTotalVisits(count);
-    } catch {
-      // ignore
-    }
+    };
 
-    // 2. Real-time Supabase Presence for accurate online viewer count
+    trackVisitor();
+
+    // 2. Real-time Supabase Presence for accurate online viewer count & realtime visits update
     try {
       const supabase = createClient();
       const channel = supabase.channel("online-presence", {
@@ -65,6 +93,27 @@ export default function Hero() {
           setLiveVisitors(Math.max(1, Object.keys(state).length));
         });
 
+      // Realtime listener for site_stats table updates
+      const statsChannel = supabase
+        .channel("site-stats-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "site_stats",
+            filter: "id=eq.global",
+          },
+          (payload) => {
+            if (payload.new && typeof (payload.new as { total_visits?: number }).total_visits === "number") {
+              const updatedCount = (payload.new as { total_visits: number }).total_visits;
+              setTotalVisits(updatedCount);
+              localStorage.setItem("mac_global_total_visits", updatedCount.toString());
+            }
+          }
+        )
+        .subscribe();
+
       channel.subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({
@@ -75,6 +124,7 @@ export default function Hero() {
 
       return () => {
         supabase.removeChannel(channel);
+        supabase.removeChannel(statsChannel);
       };
     } catch {
       // fallback
