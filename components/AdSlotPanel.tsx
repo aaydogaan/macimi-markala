@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AdSlot as AdSlotType } from "@/data/adSlots";
-import { X, Upload, Check, Eye, ExternalLink, Loader2 } from "lucide-react";
+import { X, Upload, Check, Eye, ExternalLink, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { uploadLogo as uploadLogoToSupabase, saveReservation } from "@/services/supabaseService";
 
@@ -12,6 +12,7 @@ interface AdSlotPanelProps {
   onClose: () => void;
   onLogoUpload: (logoUrl: string | null) => void;
   uploadedLogo: string | null;
+  lockedSponsor?: { brand: string; brandUrl?: string; logoUrl: string } | null;
 }
 
 type PanelStep = "detail" | "upload" | "reserve" | "success";
@@ -21,11 +22,13 @@ export default function AdSlotPanel({
   onClose,
   onLogoUpload,
   uploadedLogo,
+  lockedSponsor,
 }: AdSlotPanelProps) {
   const { t, language } = useLanguage();
   const [step, setStep] = useState<PanelStep>("detail");
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderCode, setOrderCode] = useState<string>("");
 
   // Form State
   const [brandName, setBrandName] = useState("");
@@ -36,7 +39,7 @@ export default function AdSlotPanel({
 
   if (!slot) return null;
 
-  const isSold = slot.status === "sold";
+  const isSold = slot.status === "sold" || Boolean(lockedSponsor);
 
   const sizeText =
     slot.sizeLabel === "BÜYÜK"
@@ -49,7 +52,7 @@ export default function AdSlotPanel({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 1. Instant 0ms Preview via FileReader
+    // 1. Instant 0ms Local Preview
     const reader = new FileReader();
     reader.onload = (ev) => {
       const localUrl = ev.target?.result as string;
@@ -73,7 +76,7 @@ export default function AdSlotPanel({
     }
   };
 
-  const handleCompleteReservation = async () => {
+  const handleCompleteReservationAndPay = async () => {
     if (!uploadedLogo) {
       setStep("upload");
       return;
@@ -81,16 +84,26 @@ export default function AdSlotPanel({
 
     setIsSubmitting(true);
     try {
-      await saveReservation({
+      const res = await saveReservation({
         slot_id: slot.id,
         brand_name: brandName || "İsimsiz Marka",
         brand_url: brandUrl,
         logo_url: uploadedLogo,
         amount: slot.price,
         contact_email: contactEmail,
-        status: "confirmed",
+        status: "pending",
       });
+
+      setOrderCode(res.orderCode);
       setStep("success");
+
+      // Redirect to Shopier URL after short feedback delay
+      const shopierTarget = slot.shopierUrl || "https://www.shopier.com";
+      setTimeout(() => {
+        if (shopierTarget && shopierTarget !== "https://www.shopier.com") {
+          window.open(shopierTarget, "_blank");
+        }
+      }, 1200);
     } catch (err) {
       console.error("Reservation save error:", err);
       setStep("success");
@@ -130,8 +143,15 @@ export default function AdSlotPanel({
               {/* Header */}
               <div className="flex items-start justify-between mb-8">
                 <div>
-                  <p className="text-[13px] text-[#86868B] font-medium uppercase tracking-wider">
-                    {isSold ? t.panel.soldSlot : t.panel.availableSlot}
+                  <p className="text-[13px] text-[#86868B] font-medium uppercase tracking-wider flex items-center gap-1.5">
+                    {isSold ? (
+                      <>
+                        <Lock size={14} className="text-emerald-600" />
+                        <span className="text-emerald-600 font-semibold">{t.panel.soldSlot}</span>
+                      </>
+                    ) : (
+                      t.panel.availableSlot
+                    )}
                   </p>
                   <h2 className="text-2xl font-bold text-[#1D1D1F] mt-1">
                     {slot.name} ({sizeText})
@@ -153,16 +173,27 @@ export default function AdSlotPanel({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  {/* Price */}
+                  {/* Price / Sold Banner */}
                   <div className="mb-8">
                     {isSold ? (
-                      <div>
-                        <div className="inline-flex items-center px-3 py-1 bg-[#1D1D1F] text-white text-[13px] font-medium rounded-full">
-                          {t.adAreas.sold} — {slot.brand}
+                      <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-5">
+                        <div className="flex items-center gap-2 text-emerald-800 font-semibold text-sm mb-1">
+                          <ShieldCheck size={18} />
+                          {language === "tr" ? "Bu Alan Onaylanmış Sponsorlu" : "Verified Sponsor Spot"}
                         </div>
-                        <p className="mt-3 text-[32px] font-bold text-[#1D1D1F]/30 line-through">
-                          ${slot.price}
+                        <p className="text-xl font-bold text-[#1D1D1F] mt-2">
+                          {lockedSponsor?.brand || slot.brand || "Sponsor Marka"}
                         </p>
+                        {lockedSponsor?.brandUrl && (
+                          <a
+                            href={lockedSponsor.brandUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1 font-medium"
+                          >
+                            {lockedSponsor.brandUrl} <ExternalLink size={12} />
+                          </a>
+                        )}
                       </div>
                     ) : (
                       <p className="text-[42px] font-bold text-[#1D1D1F] tracking-tight">
@@ -198,7 +229,13 @@ export default function AdSlotPanel({
                   </p>
 
                   {/* Action Button */}
-                  {!isSold && (
+                  {isSold ? (
+                    <div className="p-4 bg-[#F5F5F7] rounded-2xl text-center text-xs text-[#86868B]">
+                      {language === "tr"
+                        ? "Bu alan rezerve edilmiştir ve değiştirilemez."
+                        : "This spot is permanently reserved."}
+                    </div>
+                  ) : (
                     <button
                       onClick={() => setStep("upload")}
                       className="w-full py-3.5 bg-[#1D1D1F] text-white text-[15px] font-medium rounded-full hover:bg-black transition-all duration-300 hover:scale-[1.01] hover:shadow-lg cursor-pointer"
@@ -209,8 +246,8 @@ export default function AdSlotPanel({
                 </motion.div>
               )}
 
-              {/* Upload Step */}
-              {step === "upload" && (
+              {/* Upload Step (Only available for non-sold spots) */}
+              {!isSold && step === "upload" && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -287,7 +324,7 @@ export default function AdSlotPanel({
                     </div>
                   )}
 
-                  {/* Reserve Button */}
+                  {/* Continue Button */}
                   <button
                     onClick={() => setStep("reserve")}
                     disabled={!uploadedLogo}
@@ -297,7 +334,7 @@ export default function AdSlotPanel({
                         : "bg-[#F5F5F7] text-[#86868B] cursor-not-allowed"
                     }`}
                   >
-                    {t.panel.reserveButton}
+                    {language === "tr" ? "Bilgileri Gir & Ödemeye Geç" : "Enter Details & Checkout"}
                   </button>
 
                   <button
@@ -310,7 +347,7 @@ export default function AdSlotPanel({
               )}
 
               {/* Reserve Form Step */}
-              {step === "reserve" && (
+              {!isSold && step === "reserve" && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -320,20 +357,23 @@ export default function AdSlotPanel({
                     {t.panel.reserveTitle}
                   </h3>
                   <p className="text-[14px] text-[#86868B] mb-6">
-                    {t.panel.reserveDesc}
+                    {language === "tr"
+                      ? "Bilgilerinizi girin ve Shopier ile güvenli ödeme adımına ilerleyin."
+                      : "Enter your details to proceed with secure checkout."}
                   </p>
 
                   {/* Form Inputs */}
                   <div className="space-y-4 mb-6 text-left">
                     <div>
                       <label className="block text-[13px] font-medium text-[#1D1D1F] mb-1.5">
-                        {language === "tr" ? "Marka / Şirket Adı" : "Brand / Company Name"}
+                        {language === "tr" ? "Marka / Şirket Adı *" : "Brand / Company Name *"}
                       </label>
                       <input
                         type="text"
+                        required
                         value={brandName}
                         onChange={(e) => setBrandName(e.target.value)}
-                        placeholder="örn: Stripe, Acrobats"
+                        placeholder="örn: Stripe, Getir"
                         className="w-full px-4 py-2.5 rounded-xl border border-black/15 text-sm focus:border-black focus:outline-none"
                       />
                     </div>
@@ -346,20 +386,21 @@ export default function AdSlotPanel({
                         type="url"
                         value={brandUrl}
                         onChange={(e) => setBrandUrl(e.target.value)}
-                        placeholder="https://..."
+                        placeholder="https://siteniz.com"
                         className="w-full px-4 py-2.5 rounded-xl border border-black/15 text-sm focus:border-black focus:outline-none"
                       />
                     </div>
 
                     <div>
                       <label className="block text-[13px] font-medium text-[#1D1D1F] mb-1.5">
-                        {language === "tr" ? "İletişim E-postası" : "Contact Email"}
+                        {language === "tr" ? "İletişim E-postası *" : "Contact Email *"}
                       </label>
                       <input
                         type="email"
+                        required
                         value={contactEmail}
                         onChange={(e) => setContactEmail(e.target.value)}
-                        placeholder="hello@company.com"
+                        placeholder="hello@siteniz.com"
                         className="w-full px-4 py-2.5 rounded-xl border border-black/15 text-sm focus:border-black focus:outline-none"
                       />
                     </div>
@@ -385,14 +426,21 @@ export default function AdSlotPanel({
                   </div>
 
                   <button
-                    onClick={handleCompleteReservation}
-                    disabled={isSubmitting}
-                    className="w-full py-3.5 bg-[#1D1D1F] text-white text-[15px] font-medium rounded-full hover:bg-black transition-all duration-300 hover:scale-[1.01] hover:shadow-lg cursor-pointer flex items-center justify-center gap-2"
+                    onClick={handleCompleteReservationAndPay}
+                    disabled={isSubmitting || !brandName.trim()}
+                    className={`w-full py-3.5 text-white text-[15px] font-medium rounded-full transition-all duration-300 flex items-center justify-center gap-2 ${
+                      brandName.trim()
+                        ? "bg-[#1D1D1F] hover:bg-black hover:scale-[1.01] hover:shadow-lg cursor-pointer"
+                        : "bg-[#86868B]/40 cursor-not-allowed"
+                    }`}
                   >
                     {isSubmitting ? (
                       <Loader2 className="animate-spin" size={18} />
                     ) : (
-                      t.panel.completeReservation
+                      <>
+                        <span>{language === "tr" ? "Shopier İle Güvenli Öde" : "Pay with Shopier"}</span>
+                        <span>(${slot.price})</span>
+                      </>
                     )}
                   </button>
 
@@ -405,7 +453,7 @@ export default function AdSlotPanel({
                 </motion.div>
               )}
 
-              {/* Success Step */}
+              {/* Success / Redirect Step */}
               {step === "success" && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -430,16 +478,33 @@ export default function AdSlotPanel({
                   <h3 className="text-2xl font-bold text-[#1D1D1F] mb-2">
                     {t.panel.congratsTitle}
                   </h3>
-                  <p className="text-[15px] text-[#86868B] mb-2">
-                    {t.panel.successDesc}
+                  <p className="text-[14px] text-[#86868B] mb-4">
+                    {language === "tr"
+                      ? "Rezervasyon talebiniz oluşturuldu. Shopier ödeme sayfası açılıyor..."
+                      : "Reservation initiated. Opening payment gateway..."}
                   </p>
-                  <p className="text-[13px] text-[#86868B]/70 mb-8">
-                    {t.panel.successSub}
-                  </p>
+
+                  {orderCode && (
+                    <div className="bg-[#F5F5F7] rounded-xl p-3.5 mb-6 text-xs text-[#1D1D1F] font-mono">
+                      <span className="text-[#86868B] block mb-0.5">{language === "tr" ? "Sipariş / Takip Kodu:" : "Order Reference:"}</span>
+                      <strong className="text-sm font-bold text-[#1D1D1F]">{orderCode}</strong>
+                    </div>
+                  )}
+
+                  {slot.shopierUrl && (
+                    <a
+                      href={slot.shopierUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 w-full py-3.5 bg-blue-600 text-white text-[14px] font-medium rounded-full hover:bg-blue-700 transition-colors mb-3"
+                    >
+                      {language === "tr" ? "Shopier Sayfasına Git" : "Go to Payment Page"} <ExternalLink size={16} />
+                    </a>
+                  )}
 
                   <button
                     onClick={handleClose}
-                    className="w-full py-3.5 bg-[#1D1D1F] text-white text-[15px] font-medium rounded-full hover:bg-black transition-all duration-300 hover:scale-[1.01] hover:shadow-lg cursor-pointer"
+                    className="w-full py-3 text-[14px] text-[#86868B] hover:text-[#1D1D1F] transition-colors cursor-pointer"
                   >
                     {t.panel.closeButton}
                   </button>

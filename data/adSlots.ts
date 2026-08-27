@@ -16,6 +16,7 @@ export interface AdSlot {
   row: number;
   col: number;
   colSpan: number;
+  shopierUrl?: string;
 }
 
 export const adSlots: AdSlot[] = [

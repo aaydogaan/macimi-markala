@@ -59,8 +59,11 @@ export default function MacBookDisplay() {
   const [viewMode, setViewMode] = useState<"live" | "final">("live");
   const [selectedSlot, setSelectedSlot] = useState<AdSlotType | null>(null);
   
-  // Persistent map of slotId -> logoDataUrl
+  // Persistent map of slotId -> logoDataUrl (local preview drafts)
   const [uploadedLogos, setUploadedLogos] = useState<Record<string, string>>({});
+
+  // Verified sponsors from Supabase (locked and permanently reserved)
+  const [liveSponsors, setLiveSponsors] = useState<Record<string, { logoUrl: string; brand: string; brandUrl?: string }>>({});
 
   // Container dimensions for 3D homography calculation
   const mockupContainerRef = useRef<HTMLDivElement>(null);
@@ -89,33 +92,19 @@ export default function MacBookDisplay() {
     };
   }, [updateDimensions, viewMode]);
 
-  // Load confirmed sponsors strictly from Supabase (clearing legacy test cache)
+  // Load confirmed sponsors strictly from Supabase
   useEffect(() => {
-    // Clear old mock/test local cache so the board is clean and real
-    try {
-      localStorage.removeItem("mac_uploaded_logos");
-    } catch {
-      // ignore
-    }
-
-    // Fetch verified sponsor logos from Supabase
     const loadSupabaseLogos = async () => {
       try {
         const { fetchLiveReservations } = await import("@/services/supabaseService");
         const liveMap = await fetchLiveReservations();
         if (liveMap && Object.keys(liveMap).length > 0) {
-          const map: Record<string, string> = {};
-          for (const [id, val] of Object.entries(liveMap)) {
-            if (val.logoUrl) {
-              map[id] = val.logoUrl;
-            }
-          }
-          setUploadedLogos(map);
+          setLiveSponsors(liveMap);
         } else {
-          setUploadedLogos({});
+          setLiveSponsors({});
         }
       } catch {
-        setUploadedLogos({});
+        setLiveSponsors({});
       }
     };
     loadSupabaseLogos();
@@ -224,8 +213,9 @@ export default function MacBookDisplay() {
                 >
                   {adSlots.map((slot) => {
                     const isSelected = selectedSlot?.id === slot.id;
-                    const slotLogo = uploadedLogos[slot.id];
-                    const isSold = slot.status === "sold";
+                    const verifiedSponsor = liveSponsors[slot.id];
+                    const activeLogo = verifiedSponsor?.logoUrl || uploadedLogos[slot.id];
+                    const isSold = Boolean(verifiedSponsor) || slot.status === "sold";
 
                     const sizeText =
                       slot.sizeLabel === "BÜYÜK"
@@ -243,20 +233,22 @@ export default function MacBookDisplay() {
                         <button
                           type="button"
                           onClick={() => handleSlotClick(slot)}
-                          className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg sm:rounded-xl border border-dashed transition-all duration-200 cursor-pointer ${
-                            isSelected
+                          className={`group relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg sm:rounded-xl border transition-all duration-200 cursor-pointer ${
+                            isSold
+                              ? "border-black/20 bg-white/90 shadow-xs"
+                              : isSelected
                               ? "border-blue-600 bg-blue-50/40 ring-2 ring-blue-600 shadow-md z-20"
-                              : slotLogo
-                              ? "border-black/35 bg-white/70 shadow-xs"
-                              : "border-black/25 bg-black/[0.02] hover:border-black/45 hover:bg-black/[0.04]"
+                              : activeLogo
+                              ? "border-black/35 bg-white/70 shadow-xs border-dashed"
+                              : "border-black/25 bg-black/[0.02] hover:border-black/45 hover:bg-black/[0.04] border-dashed"
                           }`}
                         >
                           {/* Slot content */}
                           <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 sm:gap-1 px-1 py-1 sm:px-1.5 sm:py-1.5 transition duration-200 group-hover:blur-[2px] group-focus-visible:blur-[2px]">
-                            {slotLogo ? (
+                            {activeLogo ? (
                               <span className="relative flex min-h-0 w-full flex-1 items-center justify-center p-0.5">
                                 <img
-                                  src={slotLogo}
+                                  src={activeLogo}
                                   alt="Logo"
                                   className="max-h-[82%] max-w-[88%] object-contain drop-shadow-xs"
                                 />
@@ -264,7 +256,7 @@ export default function MacBookDisplay() {
                             ) : isSold ? (
                               <span className="relative flex min-h-0 w-full flex-1 items-center justify-center p-0.5">
                                 <span className="font-bold text-[11px] sm:text-xs text-black">
-                                  {slot.brand}
+                                  {verifiedSponsor?.brand || slot.brand}
                                 </span>
                               </span>
                             ) : (
@@ -284,8 +276,10 @@ export default function MacBookDisplay() {
                             aria-hidden="true"
                             className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
                           >
-                            <span className="rounded-full px-2.5 py-1 text-[10px] font-medium text-white sm:px-3.5 sm:text-[12px] bg-blue-600 shadow-sm">
-                              {slotLogo ? (language === "tr" ? "Düzenle" : "Edit") : selectLabel}
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-medium text-white sm:px-3.5 sm:text-[12px] shadow-sm ${
+                              isSold ? "bg-emerald-600" : "bg-blue-600"
+                            }`}>
+                              {isSold ? (language === "tr" ? "İncele" : "Details") : activeLogo ? (language === "tr" ? "Düzenle" : "Edit") : selectLabel}
                             </span>
                           </span>
                         </button>
@@ -332,7 +326,8 @@ export default function MacBookDisplay() {
                     }}
                   >
                     {adSlots.map((slot) => {
-                      const customLogo = uploadedLogos[slot.id];
+                      const verifiedSponsor = liveSponsors[slot.id];
+                      const customLogo = verifiedSponsor?.logoUrl || uploadedLogos[slot.id];
                       // Inner middle slots offset slightly around Apple logo
                       const translateX = slot.row !== 2 ? 0 : slot.col <= 2 ? 20 : -20;
 
@@ -424,6 +419,7 @@ export default function MacBookDisplay() {
           }
         }}
         uploadedLogo={selectedSlot ? uploadedLogos[selectedSlot.id] || null : null}
+        lockedSponsor={selectedSlot ? liveSponsors[selectedSlot.id] || null : null}
       />
     </section>
   );
